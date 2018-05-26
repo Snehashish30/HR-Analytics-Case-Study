@@ -10,6 +10,7 @@ library(caret)
 library(ggplot2)
 library(cowplot)
 library(caTools)
+library(gmodels)
 
 
 in_time1<- read.csv("in_time.csv",stringsAsFactors = F)
@@ -46,7 +47,6 @@ out_time1 <- out_time1[,-1]
 out_time2 <-out_time1
 out_time2 <-data.frame(sapply(out_time1, function(x) do_date(data.frame(x))))
 
-typeof(out_time1[1,1])
 logged_work_hrs<- out_time2-in_time2
 logged_work_hrs<-logged_work_hrs/3600
 timesheet<-cbind(emp_id,logged_work_hrs)
@@ -99,6 +99,120 @@ sapply(employee_data,FUN = function(x) ifelse((sum(is.na(x)))>0,sum(is.na(x)),"N
 employee_data <- na.omit(employee_data)
 
 
+################################################################
+#Performing EDA and outlier treatment if required
+
+prop<-CrossTable(employee_data$Attrition,prop.r = TRUE, prop.c = FALSE, prop.t = FALSE, prop.chisq = FALSE)
+#Attrition rate of 16.2%
+boxplot(employee_data$Age)
+#good to go
+employee_data%>%group_by(Attrition)%>%summarise(average_age = mean(Age))
+#seems Younger people are more likely to leave the company
+
+
+prop<-CrossTable(employee_data$MaritalStatus ,employee_data$Attrition,prop.r = TRUE, prop.c = FALSE, prop.t = FALSE, prop.chisq = FALSE)
+val <- data.frame(prop[2])
+ggplot(val, aes(x = val$prop.row.x, y= val$prop.row.Freq))+geom_bar(stat = "identity",aes(fill = val$prop.row.y),position = "dodge")+labs(x = "Grade", y = "Proportion of Leavers/Non Leavers")
+#Singles are likely to leave
+
+
+prop<-CrossTable(employee_data$BusinessTravel ,employee_data$Attrition,prop.r = TRUE, prop.c = FALSE, prop.t = FALSE, prop.chisq = FALSE)
+val <- data.frame(prop[2])
+ggplot(val, aes(x = val$prop.row.x, y= val$prop.row.Freq))+geom_bar(stat = "identity",aes(fill = val$prop.row.y),position = "dodge")+labs(x = "Grade", y = "Proportion of Leavers/Non Leavers")
+#Frequent Traveller are not happy ,hence leaving
+
+
+prop<-CrossTable(employee_data$Department ,employee_data$Attrition,prop.r = TRUE, prop.c = FALSE, prop.t = FALSE, prop.chisq = FALSE)
+val <- data.frame(prop[2])
+ggplot(val, aes(x = val$prop.row.x, y= val$prop.row.Freq))+geom_bar(stat = "identity",aes(fill = val$prop.row.y),position = "dodge")+labs(x = "Grade", y = "Proportion of Leavers/Non Leavers")
+#Human Resources Department showing huge attrion rate
+
+
+prop<-CrossTable(employee_data$StockOptionLevel ,employee_data$Attrition,prop.r = TRUE, prop.c = FALSE, prop.t = FALSE, prop.chisq = FALSE)
+val <- data.frame(prop[2])
+ggplot(val, aes(x = val$prop.row.x, y= val$prop.row.Freq))+geom_bar(stat = "identity",aes(fill = val$prop.row.y),position = "dodge")+labs(x = "Grade", y = "Proportion of Leavers/Non Leavers")
+#Not a driving factor
+
+#spread of salary
+boxplot(employee_data$MonthlyIncome)
+#there are outliers in high income 
+for(i in seq(0,1,0.1)){
+  a<-quantile(employee_data$MonthlyIncome,i) 
+  print(a)
+}
+#there is a sudden jump after 80%, hence capping the salary to 85%tile
+
+employee_data[(which(employee_data$MonthlyIncome > quantile(employee_data$MonthlyIncome,0.85))),(which(colnames(employee_data) == "MonthlyIncome"))] <- quantile(employee_data$MonthlyIncome,0.85)
+boxplot(employee_data$MonthlyIncome)
+#looks fine
+
+prop<-CrossTable(employee_data$TotalWorkingYears ,employee_data$Attrition,prop.r = TRUE, prop.c = FALSE, prop.t = FALSE, prop.chisq = FALSE)
+val <- data.frame(prop[2])
+ggplot(val, aes(x = val$prop.row.x, y= val$prop.row.Freq))+geom_bar(stat = "identity",aes(fill = val$prop.row.y),position = "dodge")+labs(x = "Working Years", y = "Proportion of Leavers/Non Leavers")
+# Attrition rate decreases with increase in Workex
+
+prop<-CrossTable(employee_data$YearsAtCompany ,employee_data$Attrition,prop.r = TRUE, prop.c = FALSE, prop.t = FALSE, prop.chisq = FALSE)
+val <- data.frame(prop[2])
+ggplot(val, aes(x = val$prop.row.x, y= val$prop.row.Freq))+geom_bar(stat = "identity",aes(fill = val$prop.row.y),position = "dodge")+labs(x = "Working Years", y = "Proportion of Leavers/Non Leavers")
+# Attrition rate decreases with increase in Workex
+
+prop<-CrossTable(employee_data$TotalWorkingYears ,employee_data$Attrition,prop.r = TRUE, prop.c = FALSE, prop.t = FALSE, prop.chisq = FALSE)
+val <- data.frame(prop[2])
+ggplot(val, aes(x = val$prop.row.x, y= val$prop.row.Freq))+geom_bar(stat = "identity",aes(fill = val$prop.row.y),position = "dodge")+labs(x = "Working Years", y = "Proportion of Leavers/Non Leavers")
+# Attrition rate decreases with increase in Workex
+
+
+prop<-CrossTable(employee_data$TotalWorkingYears ,employee_data$Attrition,prop.r = TRUE, prop.c = FALSE, prop.t = FALSE, prop.chisq = FALSE)
+val <- data.frame(prop[2])
+ggplot(val, aes(x = val$prop.row.x, y= val$prop.row.Freq))+geom_bar(stat = "identity",aes(fill = val$prop.row.y),position = "dodge")+labs(x = "Working Years", y = "Proportion of Leavers/Non Leavers")
+# Attrition rate decreases with increase in Workex
+
+options(scipen = 999)
+ggplot(employee_data,aes(x = employee_data$MonthlyIncome, col = "black"))+geom_histogram(bins= 3,aes(fill = employee_data$Attrition))
+
+
+prop<-CrossTable(employee_data$TrainingTimesLastYear ,employee_data$Attrition,prop.r = TRUE, prop.c = FALSE, prop.t = FALSE, prop.chisq = FALSE)
+val <- data.frame(prop[2])
+ggplot(val, aes(x = val$prop.row.x, y= val$prop.row.Freq))+geom_bar(stat = "identity",aes(fill = val$prop.row.y),position = "dodge")+labs(x = "Working Years", y = "Proportion of Leavers/Non Leavers")
+#Not an influencing factor
+
+prop<-CrossTable(employee_data$PercentSalaryHike ,employee_data$Attrition,prop.r = TRUE, prop.c = FALSE, prop.t = FALSE, prop.chisq = FALSE)
+val <- data.frame(prop[2])
+ggplot(val, aes(x = val$prop.row.x, y= val$prop.row.Freq))+geom_bar(stat = "identity",aes(fill = val$prop.row.y),position = "dodge")+labs(x = "Working Years", y = "Proportion of Leavers/Non Leavers")
+#Not an influencing factor
+
+ggplot(employee_data,aes(x = employee_data$avg_Workhours, col = "black"))+geom_histogram(bins= 5,aes(fill = employee_data$Attrition))
+#person working more number of hours(ie. greater than standard working hours> 8 hours) are leaving
+
+prop<-CrossTable(employee_data$YearsSinceLastPromotion ,employee_data$Attrition,prop.r = TRUE, prop.c = FALSE, prop.t = FALSE, prop.chisq = FALSE)
+val <- data.frame(prop[2])
+ggplot(val, aes(x = val$prop.row.x, y= val$prop.row.Freq))+geom_bar(stat = "identity",aes(fill = val$prop.row.y),position = "dodge")+labs(x = "Working Years", y = "Proportion of Leavers/Non Leavers")
+#employees who haven't got promoted for long time are likely to leave
+
+prop<-CrossTable(employee_data$EnvironmentSatisfaction ,employee_data$Attrition,prop.r = TRUE, prop.c = FALSE, prop.t = FALSE, prop.chisq = FALSE)
+val <- data.frame(prop[2])
+ggplot(val, aes(x = val$prop.row.x, y= val$prop.row.Freq))+geom_bar(stat = "identity",aes(fill = val$prop.row.y),position = "dodge")+labs(x = "Working Years", y = "Proportion of Leavers/Non Leavers")
+
+prop<-CrossTable(employee_data$JobSatisfaction ,employee_data$Attrition,prop.r = TRUE, prop.c = FALSE, prop.t = FALSE, prop.chisq = FALSE)
+val <- data.frame(prop[2])
+ggplot(val, aes(x = val$prop.row.x, y= val$prop.row.Freq))+geom_bar(stat = "identity",aes(fill = val$prop.row.y),position = "dodge")+labs(x = "Working Years", y = "Proportion of Leavers/Non Leavers")
+
+prop<-CrossTable(employee_data$WorkLifeBalance ,employee_data$Attrition,prop.r = TRUE, prop.c = FALSE, prop.t = FALSE, prop.chisq = FALSE)
+val <- data.frame(prop[2])
+ggplot(val, aes(x = val$prop.row.x, y= val$prop.row.Freq))+geom_bar(stat = "identity",aes(fill = val$prop.row.y),position = "dodge")+labs(x = "Working Years", y = "Proportion of Leavers/Non Leavers")
+
+#Overall we can say, employees who are not satisfied with the Worklife balance, job and environment (employee survey parameters) are likely to leave 
+
+prop<-CrossTable(employee_data$JobInvolvement ,employee_data$Attrition,prop.r = TRUE, prop.c = FALSE, prop.t = FALSE, prop.chisq = FALSE)
+val <- data.frame(prop[2])
+ggplot(val, aes(x = val$prop.row.x, y= val$prop.row.Freq))+geom_bar(stat = "identity",aes(fill = val$prop.row.y),position = "dodge")+labs(x = "Working Years", y = "Proportion of Leavers/Non Leavers")
+
+
+prop<-CrossTable(employee_data$PerformanceRating ,employee_data$Attrition,prop.r = TRUE, prop.c = FALSE, prop.t = FALSE, prop.chisq = FALSE)
+val <- data.frame(prop[2])
+ggplot(val, aes(x = val$prop.row.x, y= val$prop.row.Freq))+geom_bar(stat = "identity",aes(fill = val$prop.row.y),position = "dodge")+labs(x = "Working Years", y = "Proportion of Leavers/Non Leavers")
+
+#Not much information is derived form Manegerial survey data.
 ################################################################
 # Feature standardisation
 
@@ -169,7 +283,7 @@ test = employee_data_final[!(indices),]
 # Logistic Regression: 
 
 model_1 = glm(Attrition ~ ., data = train, family = "binomial")
-summary(model_1) #AIC: 2283.3
+summary(model_1) #AIC: 2141.9
 
 # Stepwise selection
 library("MASS")
@@ -383,13 +497,25 @@ model_18 <- glm(formula = Attrition ~ Age + BusinessTravel.xTravel_Frequently +
                   EnvironmentSatisfaction + JobSatisfaction + WorkLifeBalance + 
                   avg_Workhours, family = "binomial", data = train)
 summary(model_18)
-vif(model_17)
+vif(model_18)
+#Total working years is correlated to AGe. Person with more Age can only have more workex.
+#Hence removing the Age as it is less significant
+
+model_19 <- glm(formula = Attrition ~ BusinessTravel.xTravel_Frequently + 
+                  MaritalStatus.xSingle + 
+                  NumCompaniesWorked + TotalWorkingYears + 
+                  YearsSinceLastPromotion + YearsWithCurrManager + 
+                  EnvironmentSatisfaction + JobSatisfaction + WorkLifeBalance + 
+                  avg_Workhours, family = "binomial", data = train)
+summary(model_19)
+vif(model_19)
 #all Vif values under threshold range
 
-########################################################################
-# With 11 significant variables in the model
 
-final_model<- model_17
+########################################################################
+# With 10 significant variables in the model
+
+final_model<- model_19
 
 #######################################################################
 
@@ -414,15 +540,132 @@ test_actual_turnover <- factor(ifelse(test$Attrition==1,"Yes","No"))
 
 table(test_actual_turnover,test_pred_turnover)
 
-# Let's use the probability cutoff of 40%.
+# Let's use the probability cutoff of 35%.
 
 test_pred_turnover <- factor(ifelse(test_pred >= 0.35, "Yes", "No"))
 test_actual_turnover <- factor(ifelse(test$Attrition==1,"Yes","No"))
 
-table(test_actual_turnover,test_pred_turnover)
+a<-table(test_actual_turnover,test_pred_turnover)
+acc<- (a[1,1]+a[2,2])/sum(a)
+sens<- a[2,2]/sum(a[2,])
+spec<- a[1,1]/sum(a[1,])
+acc
+sens
+spec
+#accuracy is 85.2%
+#but sensitivity is poor
+
+#test_conf <- confusionMatrix (test_pred_turnover, test_actual_turnover, positive = "Yes")
+#test_conf
+#confusionMatrix command not working, hence calculating the accuracy, specificity and sensitivity 
+#manually as per logic  
+#########################################################################################
+# Let's Choose the cutoff value. 
+# 
+
+# Let's find out the optimal probalility cutoff 
+
+perform_fn <- function(cutoff) 
+{
+  predicted_turnover <- factor(ifelse(test_pred >= cutoff, "Yes", "No"))
+  #conf <- confusionMatrix(predicted_churn, test_actual_turnover, positive = "Yes")
+  
+  a<-table(test_actual_turnover,predicted_turnover)
+  acc<- (a[1,1]+a[2,2])/sum(a)
+  sens<- a[2,2]/sum(a[2,])
+  spec<- a[1,1]/sum(a[1,])
+  
+  out <- t(as.matrix(c(sens, spec, acc))) 
+  colnames(out) <- c("sensitivity", "specificity", "accuracy")
+  return(out)
+}
+
+# Creating cutoff values from 0.003575 to 0.812100 for plotting and initiallizing a matrix of 100 X 3.
+
+# Summary of test probability
+
+summary(test_pred)
+
+s = seq(.01,.80,length=100)
+
+OUT = matrix(0,100,3)
+OUT
+s
+for(i in 1:100)
+{
+  OUT[i,] = perform_fn(s[i])
+} 
 
 
-library(e1071)
+plot(s, OUT[,1],xlab="Cutoff",ylab="Value",cex.lab=1.5,cex.axis=1.5,ylim=c(0,1),type="l",lwd=2,axes=FALSE,col=2)
+axis(1,seq(0,1,length=5),seq(0,1,length=5),cex.lab=1.5)
+axis(2,seq(0,1,length=5),seq(0,1,length=5),cex.lab=1.5)
+lines(s,OUT[,2],col="darkgreen",lwd=2)
+lines(s,OUT[,3],col=4,lwd=2)
+box()
+legend(0,.50,col=c(2,"darkgreen",4,"darkred"),lwd=c(2,2,2,2),c("Sensitivity","Specificity","Accuracy"))
+min_diff <- min(abs(OUT[,1]-OUT[,2]))
+cutoff<- s[which(abs(OUT[,1]-OUT[,2]) == min_diff)]
+#cutoff <- s[which(abs(OUT[,1]-OUT[,2])<0.01)]
+# Let's choose a cutoff value of 0.17757 for final model
 
-test_conf <- confusionMatrix(test_pred_turnover, test_actual_turnover, positive = "Yes")
-test_conf
+test_cutoff_turnover <- factor(ifelse(test_pred >=cutoff, "Yes", "No"))
+
+a<-table(test_actual_turnover,test_cutoff_turnover)
+acc<- (a[1,1]+a[2,2])/sum(a)
+sens<- a[2,2]/sum(a[2,])
+spec<- a[1,1]/sum(a[1,])
+
+acc
+sens
+spec
+View(test)
+##################################################################################################
+### KS -statistic - Test Data ######
+
+test_cutoff_turnover <- ifelse(test_cutoff_turnover=="Yes",1,0)
+test_actual_turnover <- ifelse(test_actual_turnover=="Yes",1,0)
+
+
+library(ROCR)
+#on testing  data
+pred_object_test<- prediction(test_cutoff_turnover, test_actual_turnover)
+
+performance_measures_test<- performance(pred_object_test, "tpr", "fpr")
+
+ks_table_test <- attr(performance_measures_test, "y.values")[[1]] - 
+  (attr(performance_measures_test, "x.values")[[1]])
+
+ks_table_test
+max(ks_table_test)
+
+
+####################################################################
+# Lift & Gain Chart 
+
+# plotting the lift chart
+
+lift <- function(labels , predicted_prob,groups=10) {
+  
+  if(is.factor(labels)) labels  <- as.integer(as.character(labels ))
+  if(is.factor(predicted_prob)) predicted_prob <- as.integer(as.character(predicted_prob))
+  helper = data.frame(cbind(labels , predicted_prob))
+  helper[,"bucket"] = ntile(-helper[,"predicted_prob"], groups)
+  gaintable = helper %>% group_by(bucket)  %>%
+    summarise_at(vars(labels ), funs(total = n(),
+                                     totalresp=sum(., na.rm = TRUE))) %>%
+    
+    mutate(Cumresp = cumsum(totalresp),
+           Gain=Cumresp/sum(totalresp)*100,
+           Cumlift=Gain/(bucket*(100/groups))) 
+  return(gaintable)
+}
+
+Attrition_decile = lift(test_actual_turnover, test_pred, groups = 10)
+Attrition_decile
+
+#plotting gain chart
+ggplot(Attrition_decile, aes(x = bucket, y = Gain/100))+geom_point()+geom_line()
+plot(Attrition_decile$bucket, Attrition_decile$Gain, type="o", col="blue", pch="o", lty=1, ylim=c(0,110) )
+points(Attrition_decile$bucket,Attrition_decile$bucket*10 , col="red", pch="*")
+lines(Attrition_decile$bucket,Attrition_decile$bucket*10, col="red",lty=2)
