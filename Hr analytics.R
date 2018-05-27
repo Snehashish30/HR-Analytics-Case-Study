@@ -11,7 +11,7 @@ library(ggplot2)
 library(cowplot)
 library(caTools)
 library(gmodels)
-
+library(corrplot)
 
 in_time1<- read.csv("in_time.csv",stringsAsFactors = F)
 out_time1<- read.csv("out_time.csv",stringsAsFactors = F)
@@ -19,6 +19,17 @@ out_time1<- read.csv("out_time.csv",stringsAsFactors = F)
 in_time1 <-in_time1[,-c(2,11,19,47,88,143,187,198,224,225,226,258)]
 out_time1 <-out_time1[,-c(2,11,19,47,88,143,187,198,224,225,226,258)]
 
+
+##################################
+#do_date() function cleans and transforms the date
+#data without transforming into long format.
+#It processes and out puts the data in the same format 
+#as given for 250+ working days, so that it is pleasing
+#to eye and can be visualised in tabular form, even in excel
+#gather() is NOT USED intentionally to improve performance
+#of changing the formats 2 times
+
+##################################
 do_date <- function(in_time){
 #get the date, We will use it as column name also
 in_time <- separate(in_time,colnames(in_time), into = c("Date","Time"), sep = " ", remove = T)
@@ -36,13 +47,14 @@ in_time$Date_part <- as.POSIXct(in_time$Date_part)
 colnames(in_time)[which(colnames(in_time) == "Date_part")] <- Date_part
 return (in_time)
 }
-emp_id <- in_time1[,1]
+in_time_emp_id <- in_time1[,1]
 in_time1 <- in_time1[,-1]
 in_time2 <-data.frame(sapply(in_time1, function(x) do_date(data.frame(x))))
 #a <- (out_time2$X2.Jan.15.2015.01.02)-(in_time2$X2.Jan.15.2015.01.02)
 #took a long time to process
 
 #process for out time
+out_time_emp_id <- out_time1[,1]
 out_time1 <- out_time1[,-1]
 out_time2 <-out_time1
 out_time2 <-data.frame(sapply(out_time1, function(x) do_date(data.frame(x))))
@@ -77,6 +89,44 @@ setdiff(employee_data_final$EmployeeID,employee_survey_data$EmployeeID)
 setdiff(employee_data_final$EmployeeID,manager_survey_data$EmployeeID)
 #no difference , we can directly bind instead of logical join
 
+### Checking for duplicate data ##
+
+##Employee data
+if(length(unique(employee_data$EmployeeID))==length(employee_data$EmployeeID)){
+  print("EmployeeID is Unique. Total Unique EmployeeID:")
+  print(length(unique(employee_data$EmployeeID)))
+}else {
+  print("EmployeeID is not Unique in Employee_data")
+}
+##Employee_Survey
+if(length(unique(employee_survey_data$EmployeeID))==length(employee_survey_data$EmployeeID)){
+  print("EmployeeID is Unique. Total Unique EmployeeID:")
+  print(length(unique(employee_survey_data$EmployeeID)))
+}else {
+  print("EmployeeID is not Unique in Employee_Survey_data")
+}
+##Manager_Survey
+if(length(unique(manager_survey_data$EmployeeID))==length(manager_survey_data$EmployeeID)){
+  print("EmployeeID is Unique. Total Unique EmployeeID:")
+  print(length(unique(manager_survey_data$EmployeeID)))
+}else {
+  print("EmployeeID is not Unique in Manager_Survey_data")
+}
+## in_time, we have separated out the empids in in_time_emp_id
+if(length(unique(in_time_emp_id))==length(in_time_emp_id)){
+  print("EmployeeID is Unique. Total Unique EmployeeID:")
+  print(length(unique(emp_id)))
+}else {
+  print("EmployeeID is not Unique in In_time_data")
+}
+## in_time, we have separated out the empids in out_time_emp_id
+if(length(unique(out_time_emp_id))==length(out_time_emp_id)){
+  print("EmployeeID is Unique. Total Unique EmployeeID:")
+  print(length(unique(out_time_emp_id)))
+}else {
+  print("EmployeeID is not Unique in Out_time_data")
+}
+
 sapply(employee_survey_data,FUN = function(x) ifelse((sum(is.na(x)))>0,sum(is.na(x)),"No NA"))
 employee_survey_data<- na.omit(employee_survey_data)
 sapply(manager_survey_data,FUN = function(x) ifelse((sum(is.na(x)))>0,sum(is.na(x)),"No NA"))
@@ -89,7 +139,7 @@ employee_data <-employee_data%>%inner_join(manager_survey_data,by = c("EmployeeI
 
 employee_data <- employee_data%>%inner_join(workhrs_details, by = c("EmployeeID" = "emp_id"))
 
-#Removing redundand columns
+#Removing redundant columns
 employee_data <- employee_data[,-c(8,16,18)]
 
 sapply(employee_data,FUN = function(x) ifelse((sum(is.na(x)))>0,sum(is.na(x)),"No NA"))
@@ -99,8 +149,100 @@ sapply(employee_data,FUN = function(x) ifelse((sum(is.na(x)))>0,sum(is.na(x)),"N
 employee_data <- na.omit(employee_data)
 
 
-################################################################
+########################################################################################################
+########################################################################################################
 #Performing EDA and outlier treatment if required
+
+
+box_theme<- theme(axis.line=element_blank(),axis.title=element_blank(), 
+                  axis.ticks=element_blank(), axis.text=element_blank())
+
+box_theme_y<- theme(axis.line.y=element_blank(),axis.title.y=element_blank(), 
+                    axis.ticks.y=element_blank(), axis.text.y=element_blank(),
+                    legend.position="none")
+
+plot_grid(ggplot(employee_data, aes(x=Attrition,y=Age, fill=Attrition))+ geom_boxplot(width=0.2)+ 
+            coord_flip() +theme(legend.position="none"),
+          ggplot(employee_data, aes(x=Attrition,y=DistanceFromHome, fill=Attrition))+ geom_boxplot(width=0.2)+
+            coord_flip() + box_theme_y,
+          ggplot(employee_data, aes(x=Attrition,y=leaves, fill=Attrition))+ geom_boxplot(width=0.2)+
+            coord_flip() + box_theme_y,
+          align = "v",nrow = 1)
+
+plot_grid(ggplot(employee_data, aes(x=Attrition,y=MonthlyIncome, fill=Attrition))+ geom_boxplot(width=0.2)+ 
+            coord_flip() +theme(legend.position="none"),
+          ggplot(employee_data, aes(x=Attrition,y=NumCompaniesWorked, fill=Attrition))+ geom_boxplot(width=0.2)+
+            coord_flip() + box_theme_y,
+          ggplot(employee_data, aes(x=Attrition,y=PercentSalaryHike, fill=Attrition))+ geom_boxplot(width=0.2)+
+            coord_flip() + box_theme_y,
+          align = "v",nrow = 1)
+
+
+plot_grid(ggplot(employee_data, aes(x=Attrition,y=avg_Workhours, fill=Attrition))+ geom_boxplot(width=0.2)+ 
+            coord_flip() +theme(legend.position="none"),
+          ggplot(employee_data, aes(x=Attrition,y=TotalWorkingYears, fill=Attrition))+ geom_boxplot(width=0.2)+
+            coord_flip() + box_theme_y,
+          ggplot(employee_data, aes(x=Attrition,y=TrainingTimesLastYear, fill=Attrition))+ geom_boxplot(width=0.2)+
+            coord_flip() + box_theme_y,
+          align = "v",nrow = 1)
+
+
+plot_grid(ggplot(employee_data, aes(x=Attrition,y=YearsSinceLastPromotion, fill=Attrition))+ geom_boxplot(width=0.2)+ 
+            coord_flip() +theme(legend.position="none"),
+          ggplot(employee_data, aes(x=Attrition,y=YearsWithCurrManager, fill=Attrition))+ geom_boxplot(width=0.2)+
+            coord_flip() + box_theme_y,
+          align = "v",nrow = 1)
+
+
+plot_grid(ggplot(employee_data, aes(x=Attrition,y=YearsAtCompany, fill=Attrition))+ geom_boxplot(width=0.2)+ 
+            coord_flip() +theme(legend.position="none"),
+          align = "v",nrow = 1)
+
+bar_theme1<- theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5), 
+                   legend.position="none")
+
+plot_grid(ggplot(employee_data, aes(x=BusinessTravel,fill=Attrition))
+          + geom_bar(position = position_fill())+ labs(y="Proportion"),
+          ggplot(employee_data, aes(x=Department,fill=Attrition))
+          + geom_bar(position = position_fill())+ labs(y="Proportion")
+          + bar_theme1, align = "h") 
+
+plot_grid(ggplot(employee_data, aes(x=Education,fill=Attrition))
+          + geom_bar(position = position_fill())+ labs(y="Proportion"),
+          ggplot(employee_data, aes(x=JobRole,fill=Attrition))
+          + geom_bar(position = position_fill())+ labs(y="Proportion")
+          + bar_theme1, align = "h")
+
+plot_grid(ggplot(employee_data, aes(x=MaritalStatus,fill=Attrition))
+          + geom_bar(position = position_fill())+ labs(y="Proportion"),
+          ggplot(employee_data, aes(x=StockOptionLevel,fill=Attrition))
+          + geom_bar(position = position_fill())+ labs(y="Proportion")
+          + bar_theme1, align = "h")
+
+plot_grid(ggplot(employee_data, aes(x=EnvironmentSatisfaction,fill=Attrition))
+          + geom_bar(position = position_fill())+ labs(y="Proportion"),
+          ggplot(employee_data, aes(x=JobSatisfaction,fill=Attrition))
+          + geom_bar(position = position_fill())+ labs(y="Proportion")
+          + bar_theme1, align = "h")
+
+plot_grid(ggplot(employee_data, aes(x=WorkLifeBalance,fill=Attrition))
+          + geom_bar(position = position_fill())+ labs(y="Proportion"),
+          ggplot(employee_data, aes(x=JobInvolvement,fill=Attrition))
+          + geom_bar(position = position_fill())+ labs(y="Proportion")
+          + bar_theme1, align = "h")
+
+plot_grid(ggplot(employee_data, aes(x=PerformanceRating,fill=Attrition))
+          + geom_bar(position = position_fill())+ labs(y="Proportion"),
+          ggplot(employee_data, aes(x=EducationField,fill=Attrition))
+          + geom_bar(position = position_fill())+ labs(y="Proportion")
+          + bar_theme1, align = "h")
+
+
+
+########################################################################################################
+########################################################################################################
+
+#For Tabular data in proportion, below code is written 
 
 prop<-CrossTable(employee_data$Attrition,prop.r = TRUE, prop.c = FALSE, prop.t = FALSE, prop.chisq = FALSE)
 #Attrition rate of 16.2%
@@ -111,26 +253,18 @@ employee_data%>%group_by(Attrition)%>%summarise(average_age = mean(Age))
 
 
 prop<-CrossTable(employee_data$MaritalStatus ,employee_data$Attrition,prop.r = TRUE, prop.c = FALSE, prop.t = FALSE, prop.chisq = FALSE)
-val <- data.frame(prop[2])
-ggplot(val, aes(x = val$prop.row.x, y= val$prop.row.Freq))+geom_bar(stat = "identity",aes(fill = val$prop.row.y),position = "dodge")+labs(x = "Grade", y = "Proportion of Leavers/Non Leavers")
 #Singles are likely to leave
 
 
 prop<-CrossTable(employee_data$BusinessTravel ,employee_data$Attrition,prop.r = TRUE, prop.c = FALSE, prop.t = FALSE, prop.chisq = FALSE)
-val <- data.frame(prop[2])
-ggplot(val, aes(x = val$prop.row.x, y= val$prop.row.Freq))+geom_bar(stat = "identity",aes(fill = val$prop.row.y),position = "dodge")+labs(x = "Grade", y = "Proportion of Leavers/Non Leavers")
 #Frequent Traveller are not happy ,hence leaving
 
 
 prop<-CrossTable(employee_data$Department ,employee_data$Attrition,prop.r = TRUE, prop.c = FALSE, prop.t = FALSE, prop.chisq = FALSE)
-val <- data.frame(prop[2])
-ggplot(val, aes(x = val$prop.row.x, y= val$prop.row.Freq))+geom_bar(stat = "identity",aes(fill = val$prop.row.y),position = "dodge")+labs(x = "Grade", y = "Proportion of Leavers/Non Leavers")
 #Human Resources Department showing huge attrion rate
 
 
 prop<-CrossTable(employee_data$StockOptionLevel ,employee_data$Attrition,prop.r = TRUE, prop.c = FALSE, prop.t = FALSE, prop.chisq = FALSE)
-val <- data.frame(prop[2])
-ggplot(val, aes(x = val$prop.row.x, y= val$prop.row.Freq))+geom_bar(stat = "identity",aes(fill = val$prop.row.y),position = "dodge")+labs(x = "Grade", y = "Proportion of Leavers/Non Leavers")
 #Not a driving factor
 
 #spread of salary
@@ -147,24 +281,16 @@ boxplot(employee_data$MonthlyIncome)
 #looks fine
 
 prop<-CrossTable(employee_data$TotalWorkingYears ,employee_data$Attrition,prop.r = TRUE, prop.c = FALSE, prop.t = FALSE, prop.chisq = FALSE)
-val <- data.frame(prop[2])
-ggplot(val, aes(x = val$prop.row.x, y= val$prop.row.Freq))+geom_bar(stat = "identity",aes(fill = val$prop.row.y),position = "dodge")+labs(x = "Working Years", y = "Proportion of Leavers/Non Leavers")
 # Attrition rate decreases with increase in Workex
 
 prop<-CrossTable(employee_data$YearsAtCompany ,employee_data$Attrition,prop.r = TRUE, prop.c = FALSE, prop.t = FALSE, prop.chisq = FALSE)
-val <- data.frame(prop[2])
-ggplot(val, aes(x = val$prop.row.x, y= val$prop.row.Freq))+geom_bar(stat = "identity",aes(fill = val$prop.row.y),position = "dodge")+labs(x = "Working Years", y = "Proportion of Leavers/Non Leavers")
 # Attrition rate decreases with increase in Workex
 
 prop<-CrossTable(employee_data$TotalWorkingYears ,employee_data$Attrition,prop.r = TRUE, prop.c = FALSE, prop.t = FALSE, prop.chisq = FALSE)
-val <- data.frame(prop[2])
-ggplot(val, aes(x = val$prop.row.x, y= val$prop.row.Freq))+geom_bar(stat = "identity",aes(fill = val$prop.row.y),position = "dodge")+labs(x = "Working Years", y = "Proportion of Leavers/Non Leavers")
 # Attrition rate decreases with increase in Workex
 
 
 prop<-CrossTable(employee_data$TotalWorkingYears ,employee_data$Attrition,prop.r = TRUE, prop.c = FALSE, prop.t = FALSE, prop.chisq = FALSE)
-val <- data.frame(prop[2])
-ggplot(val, aes(x = val$prop.row.x, y= val$prop.row.Freq))+geom_bar(stat = "identity",aes(fill = val$prop.row.y),position = "dodge")+labs(x = "Working Years", y = "Proportion of Leavers/Non Leavers")
 # Attrition rate decreases with increase in Workex
 
 options(scipen = 999)
@@ -172,45 +298,29 @@ ggplot(employee_data,aes(x = employee_data$MonthlyIncome, col = "black"))+geom_h
 
 
 prop<-CrossTable(employee_data$TrainingTimesLastYear ,employee_data$Attrition,prop.r = TRUE, prop.c = FALSE, prop.t = FALSE, prop.chisq = FALSE)
-val <- data.frame(prop[2])
-ggplot(val, aes(x = val$prop.row.x, y= val$prop.row.Freq))+geom_bar(stat = "identity",aes(fill = val$prop.row.y),position = "dodge")+labs(x = "Working Years", y = "Proportion of Leavers/Non Leavers")
-#Not an influencing factor
+#TrainingTimesLastYear not much an influencing factor
 
 prop<-CrossTable(employee_data$PercentSalaryHike ,employee_data$Attrition,prop.r = TRUE, prop.c = FALSE, prop.t = FALSE, prop.chisq = FALSE)
-val <- data.frame(prop[2])
-ggplot(val, aes(x = val$prop.row.x, y= val$prop.row.Freq))+geom_bar(stat = "identity",aes(fill = val$prop.row.y),position = "dodge")+labs(x = "Working Years", y = "Proportion of Leavers/Non Leavers")
 #Not an influencing factor
 
 ggplot(employee_data,aes(x = employee_data$avg_Workhours, col = "black"))+geom_histogram(bins= 5,aes(fill = employee_data$Attrition))
 #person working more number of hours(ie. greater than standard working hours> 8 hours) are leaving
 
 prop<-CrossTable(employee_data$YearsSinceLastPromotion ,employee_data$Attrition,prop.r = TRUE, prop.c = FALSE, prop.t = FALSE, prop.chisq = FALSE)
-val <- data.frame(prop[2])
-ggplot(val, aes(x = val$prop.row.x, y= val$prop.row.Freq))+geom_bar(stat = "identity",aes(fill = val$prop.row.y),position = "dodge")+labs(x = "Working Years", y = "Proportion of Leavers/Non Leavers")
 #employees who haven't got promoted for long time are likely to leave
 
 prop<-CrossTable(employee_data$EnvironmentSatisfaction ,employee_data$Attrition,prop.r = TRUE, prop.c = FALSE, prop.t = FALSE, prop.chisq = FALSE)
-val <- data.frame(prop[2])
-ggplot(val, aes(x = val$prop.row.x, y= val$prop.row.Freq))+geom_bar(stat = "identity",aes(fill = val$prop.row.y),position = "dodge")+labs(x = "Working Years", y = "Proportion of Leavers/Non Leavers")
 
 prop<-CrossTable(employee_data$JobSatisfaction ,employee_data$Attrition,prop.r = TRUE, prop.c = FALSE, prop.t = FALSE, prop.chisq = FALSE)
-val <- data.frame(prop[2])
-ggplot(val, aes(x = val$prop.row.x, y= val$prop.row.Freq))+geom_bar(stat = "identity",aes(fill = val$prop.row.y),position = "dodge")+labs(x = "Working Years", y = "Proportion of Leavers/Non Leavers")
 
 prop<-CrossTable(employee_data$WorkLifeBalance ,employee_data$Attrition,prop.r = TRUE, prop.c = FALSE, prop.t = FALSE, prop.chisq = FALSE)
-val <- data.frame(prop[2])
-ggplot(val, aes(x = val$prop.row.x, y= val$prop.row.Freq))+geom_bar(stat = "identity",aes(fill = val$prop.row.y),position = "dodge")+labs(x = "Working Years", y = "Proportion of Leavers/Non Leavers")
 
 #Overall we can say, employees who are not satisfied with the Worklife balance, job and environment (employee survey parameters) are likely to leave 
 
 prop<-CrossTable(employee_data$JobInvolvement ,employee_data$Attrition,prop.r = TRUE, prop.c = FALSE, prop.t = FALSE, prop.chisq = FALSE)
-val <- data.frame(prop[2])
-ggplot(val, aes(x = val$prop.row.x, y= val$prop.row.Freq))+geom_bar(stat = "identity",aes(fill = val$prop.row.y),position = "dodge")+labs(x = "Working Years", y = "Proportion of Leavers/Non Leavers")
 
 
 prop<-CrossTable(employee_data$PerformanceRating ,employee_data$Attrition,prop.r = TRUE, prop.c = FALSE, prop.t = FALSE, prop.chisq = FALSE)
-val <- data.frame(prop[2])
-ggplot(val, aes(x = val$prop.row.x, y= val$prop.row.Freq))+geom_bar(stat = "identity",aes(fill = val$prop.row.y),position = "dodge")+labs(x = "Working Years", y = "Proportion of Leavers/Non Leavers")
 
 #Not much information is derived form Manegerial survey data.
 ################################################################
@@ -227,7 +337,7 @@ employee_data$Attrition <- ifelse(employee_data$Attrition=="Yes",1,0)
 # Checking churn rate of prospect customer
 
 attrition <- sum(employee_data$Attrition)/nrow(employee_data)
-attrition # 16.08% attrition rate. 
+attrition # 16.16% attrition rate. 
 
 # creating a dataframe of categorical features
 employee_data_chr<- employee_data[,c(3,4,7,9,11,12)]
@@ -265,6 +375,14 @@ scale_var <- employee_data_final[,c(4,5,7,8,9,10,11,12,13,14,15,16,17,18,19,20,2
 scaled_var<- data.frame(sapply(scale_var, do_scale))
 employee_data_final<- employee_data_final[,-c(4,5,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21)]
 employee_data_final <- cbind(employee_data_final,scaled_var)
+
+#checking for correlation between Attrition and other variables
+correlation_matrix <- cor(employee_data_final)
+corrplot(correlation_matrix, method = "number", title = "Correlation Map", mar=c(0,0,1,0),
+         type = "lower", order = "FPC",col = c("red", "orange", "blue", "green"), number.cex = .5, tl.cex = 0.5)
+
+
+
 ######################
 #Ready for model
 ######################
@@ -606,12 +724,12 @@ box()
 legend(0,.50,col=c(2,"darkgreen",4,"darkred"),lwd=c(2,2,2,2),c("Sensitivity","Specificity","Accuracy"))
 min_diff <- min(abs(OUT[,1]-OUT[,2]))
 cutoff<- s[which(abs(OUT[,1]-OUT[,2]) == min_diff)]
-#cutoff <- s[which(abs(OUT[,1]-OUT[,2])<0.01)]
 # Let's choose a cutoff value of 0.17757 for final model
 
 test_cutoff_turnover <- factor(ifelse(test_pred >=cutoff, "Yes", "No"))
 
 a<-table(test_actual_turnover,test_cutoff_turnover)
+a
 acc<- (a[1,1]+a[2,2])/sum(a)
 sens<- a[2,2]/sum(a[2,])
 spec<- a[1,1]/sum(a[1,])
