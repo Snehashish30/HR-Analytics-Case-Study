@@ -13,9 +13,23 @@ library(caTools)
 library(gmodels)
 library(corrplot)
 
+# DATA files:-
+# 1. general_data.csv  - File with general information which includes demographic informations             
+#                      - information on Age, working experience educational background, department, gender 
+#                         monthly income, salary hike recieved etc                             
+# 2. employee_survey.csv  - information on survey done for employee regarding job statisfacton, enviroment
+#                           statisfaction etc                                                             
+# 3. manager_survey.csv   - information on survey given by manager regarding performance of the employee  
+#                           job involvement level                                                         
+# 4. in_time.csv          - information on in time of employee, helps for calculation of working hours    
+# 5. out_time.csv         - information on out time of employee, helps for calcualtion of working hours of
+#                           employee                                                                      
+
+
 in_time1<- read.csv("in_time.csv",stringsAsFactors = F)
 out_time1<- read.csv("out_time.csv",stringsAsFactors = F)
-#remove the company declared holidays
+### Cleaning the In_time and Out_time files
+#Remove the company's declared holidays
 in_time1 <-in_time1[,-c(2,11,19,47,88,143,187,198,224,225,226,258)]
 out_time1 <-out_time1[,-c(2,11,19,47,88,143,187,198,224,225,226,258)]
 
@@ -30,6 +44,7 @@ out_time1 <-out_time1[,-c(2,11,19,47,88,143,187,198,224,225,226,258)]
 #of changing the formats 2 times
 
 ##################################
+## Separating the date and time to calculate the working hrs.
 do_date <- function(in_time){
 #get the date, We will use it as column name also
 in_time <- separate(in_time,colnames(in_time), into = c("Date","Time"), sep = " ", remove = T)
@@ -50,7 +65,6 @@ return (in_time)
 in_time_emp_id <- in_time1[,1]
 in_time1 <- in_time1[,-1]
 in_time2 <-data.frame(sapply(in_time1, function(x) do_date(data.frame(x))))
-#a <- (out_time2$X2.Jan.15.2015.01.02)-(in_time2$X2.Jan.15.2015.01.02)
 #took a long time to process
 
 #process for out time
@@ -59,12 +73,15 @@ out_time1 <- out_time1[,-1]
 out_time2 <-out_time1
 out_time2 <-data.frame(sapply(out_time1, function(x) do_date(data.frame(x))))
 
+
+# Calculating the logged working hours. We have to get the difference of outime and intime.
 logged_work_hrs<- out_time2-in_time2
 logged_work_hrs<-logged_work_hrs/3600
 timesheet<-cbind(emp_id,logged_work_hrs)
 timesheet$avg_Workhours<- NA
 timesheet$leaves<- NA
 
+## Calculating the Average working hrs of each employee
 
 for(i in 1:nrow(timesheet)){
   row<- timesheet[i,c(-1,-251,-252)]
@@ -74,9 +91,10 @@ for(i in 1:nrow(timesheet)){
   timesheet[i,which(colnames(timesheet) == "leaves")]<- length(which(row[,1] == 0))
 }
 
+# Avg working hr is stored as workhrs_details.
 workhrs_details <- timesheet[,c(1,251,252)]
 ##########################################################################################
-
+#Importing all the employee files into r ##
 #load general data
 
 employee_data <- read.csv("general_data.csv",stringsAsFactors = F)
@@ -84,6 +102,7 @@ employee_survey_data <- read.csv("employee_survey_data.csv",stringsAsFactors = F
 manager_survey_data <- read.csv("manager_survey_data.csv",stringsAsFactors = F)
 
 #adding survey information
+#Lets see whether all the employeeID from employee_data is  present in all the dataframe. With sediff function we can achieve this.
 setdiff(employee_data_final$EmployeeID,employee_survey_data$EmployeeID)
 #no difference , we can directly bind instead of logical join
 setdiff(employee_data_final$EmployeeID,manager_survey_data$EmployeeID)
@@ -129,8 +148,10 @@ if(length(unique(out_time_emp_id))==length(out_time_emp_id)){
 
 sapply(employee_survey_data,FUN = function(x) ifelse((sum(is.na(x)))>0,sum(is.na(x)),"No NA"))
 employee_survey_data<- na.omit(employee_survey_data)
-sapply(manager_survey_data,FUN = function(x) ifelse((sum(is.na(x)))>0,sum(is.na(x)),"No NA"))
+# EnvironmentSatisfaction has 25 NA. JobSatisfaction has 20 NA. WorkLifeBalancehas 38 NA. Removing the records with NA as the missing values are less.
 
+sapply(manager_survey_data,FUN = function(x) ifelse((sum(is.na(x)))>0,sum(is.na(x)),"No NA"))
+# No Missing data
 
 #but we have removed certain records from both so, have to join
 employee_data <-employee_data%>%inner_join(employee_survey_data,by = c("EmployeeID" = "EmployeeID"))
@@ -143,7 +164,7 @@ employee_data <- employee_data%>%inner_join(workhrs_details, by = c("EmployeeID"
 employee_data <- employee_data[,-c(8,16,18)]
 
 sapply(employee_data,FUN = function(x) ifelse((sum(is.na(x)))>0,sum(is.na(x)),"No NA"))
-#NumCompaniesWorked ,TotalWorkingYears has 19 and 9 NAs respectively
+#NumCompaniesWorked ,TotalWorkingYears has 19 and 8 NAs respectively
 #Nas are very less in number, hence deleting
 
 employee_data <- na.omit(employee_data)
@@ -168,7 +189,7 @@ plot_grid(ggplot(employee_data, aes(x=Attrition,y=Age, fill=Attrition))+ geom_bo
           ggplot(employee_data, aes(x=Attrition,y=leaves, fill=Attrition))+ geom_boxplot(width=0.2)+
             coord_flip() + box_theme_y,
           align = "v",nrow = 1)
-
+##Seems Younger people are more likely to leave the company
 plot_grid(ggplot(employee_data, aes(x=Attrition,y=MonthlyIncome, fill=Attrition))+ geom_boxplot(width=0.2)+ 
             coord_flip() +theme(legend.position="none"),
           ggplot(employee_data, aes(x=Attrition,y=NumCompaniesWorked, fill=Attrition))+ geom_boxplot(width=0.2)+
@@ -176,6 +197,7 @@ plot_grid(ggplot(employee_data, aes(x=Attrition,y=MonthlyIncome, fill=Attrition)
           ggplot(employee_data, aes(x=Attrition,y=PercentSalaryHike, fill=Attrition))+ geom_boxplot(width=0.2)+
             coord_flip() + box_theme_y,
           align = "v",nrow = 1)
+# Attrition rate decreases with increase in the number of years in the company.
 
 
 plot_grid(ggplot(employee_data, aes(x=Attrition,y=avg_Workhours, fill=Attrition))+ geom_boxplot(width=0.2)+ 
@@ -185,13 +207,15 @@ plot_grid(ggplot(employee_data, aes(x=Attrition,y=avg_Workhours, fill=Attrition)
           ggplot(employee_data, aes(x=Attrition,y=TrainingTimesLastYear, fill=Attrition))+ geom_boxplot(width=0.2)+
             coord_flip() + box_theme_y,
           align = "v",nrow = 1)
-
+#person working more number of hours(ie. greater than standard working hours> 8 hours) are leaving
+#Training time is Not an influencing factor.
 
 plot_grid(ggplot(employee_data, aes(x=Attrition,y=YearsSinceLastPromotion, fill=Attrition))+ geom_boxplot(width=0.2)+ 
             coord_flip() +theme(legend.position="none"),
           ggplot(employee_data, aes(x=Attrition,y=YearsWithCurrManager, fill=Attrition))+ geom_boxplot(width=0.2)+
             coord_flip() + box_theme_y,
           align = "v",nrow = 1)
+#employees who haven't got promoted for long time are likely to leave
 
 
 plot_grid(ggplot(employee_data, aes(x=Attrition,y=YearsAtCompany, fill=Attrition))+ geom_boxplot(width=0.2)+ 
@@ -206,6 +230,8 @@ plot_grid(ggplot(employee_data, aes(x=BusinessTravel,fill=Attrition))
           ggplot(employee_data, aes(x=Department,fill=Attrition))
           + geom_bar(position = position_fill())+ labs(y="Proportion")
           + bar_theme1, align = "h") 
+#Frequent Travellers are bit high who are leaving the company. This may be due to they are not happy to travel or They are in more demand in market due to their global exposure.
+#Human Resources Department is showing huge attrion rate
 
 plot_grid(ggplot(employee_data, aes(x=Education,fill=Attrition))
           + geom_bar(position = position_fill())+ labs(y="Proportion"),
@@ -218,6 +244,9 @@ plot_grid(ggplot(employee_data, aes(x=MaritalStatus,fill=Attrition))
           ggplot(employee_data, aes(x=StockOptionLevel,fill=Attrition))
           + geom_bar(position = position_fill())+ labs(y="Proportion")
           + bar_theme1, align = "h")
+
+#StockOptionLevel doesn't show much impact.Its not a driving factor
+#singles are leaving the company
 
 plot_grid(ggplot(employee_data, aes(x=EnvironmentSatisfaction,fill=Attrition))
           + geom_bar(position = position_fill())+ labs(y="Proportion"),
@@ -237,6 +266,7 @@ plot_grid(ggplot(employee_data, aes(x=PerformanceRating,fill=Attrition))
           + geom_bar(position = position_fill())+ labs(y="Proportion")
           + bar_theme1, align = "h")
 
+#Overall we can say, employees who are not satisfied with the Worklife balance, job and environment (employee survey parameters) are likely to leave 
 
 
 ########################################################################################################
@@ -295,7 +325,7 @@ prop<-CrossTable(employee_data$TotalWorkingYears ,employee_data$Attrition,prop.r
 
 options(scipen = 999)
 ggplot(employee_data,aes(x = employee_data$MonthlyIncome, col = "black"))+geom_histogram(bins= 3,aes(fill = employee_data$Attrition))
-
+# The Mid of the plot shows bit high attrition rate
 
 prop<-CrossTable(employee_data$TrainingTimesLastYear ,employee_data$Attrition,prop.r = TRUE, prop.c = FALSE, prop.t = FALSE, prop.chisq = FALSE)
 #TrainingTimesLastYear not much an influencing factor
